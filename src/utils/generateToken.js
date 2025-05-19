@@ -1,0 +1,9 @@
+const jwt = require('jsonwebtoken')
+const config = require('../config')
+
+const generateToken = (id, email) =>
+  jwt.sign({ id, email }, config.get('JWT_SECRET'), {
+    expiresIn: '1h' // Token expiration time
+  })
+
+module.exports = generateToken
