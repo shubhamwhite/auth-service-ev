@@ -1,9 +1,9 @@
 const amqp = require('amqplib')
-
+const config = require('../config/')
 let channel
 
 async function connectRabbitMQ() {
-  const connection = await amqp.connect('amqp://127.0.0.1')
+  const connection = await amqp.connect(config.get('AMQP_URL'))
   channel = await connection.createChannel()
   await channel.assertQueue('emailQueue', { durable: true })
   return channel

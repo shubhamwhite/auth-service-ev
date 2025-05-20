@@ -273,7 +273,7 @@ exports.resendOtpOrForgotPassword = async (req, res, next) => {
         email,
         otp,
         name: user.first_name,
-        flag // 'verify' or 'forgot_password'
+        flag
       }
 
       channel.sendToQueue('emailQueue', Buffer.from(JSON.stringify(emailJob)), {
@@ -355,9 +355,10 @@ exports.getUser = async (req, res, next) => {
 
     const user = await _User.findOne({
       where: { id: userId },
-      attributes: ['id', 'name', 'email', 'profile_image']
+      attributes: ['id', 'first_name', 'last_name', 'email', 'profile_image']
     })
 
+    console.log('user___++++++++++++', user.profile_image)
     const imagePath = user.profile_image
     const split = imagePath.split('/')
     const fileName = split[split.length - 1]
@@ -407,7 +408,7 @@ exports.getUser = async (req, res, next) => {
 exports.updateUser = async (req, res, next) => {
   try {
     const userId = req.params.id
-    const { name, email, password, otp } = req.body
+    const { first_name, last_name, email, password, otp } = req.body
 
     const user = await _User.findByPk(userId)
     if (!user) {
@@ -469,7 +470,8 @@ exports.updateUser = async (req, res, next) => {
     }
 
     await user.update({
-      name: name || user.name,
+      first_name: first_name || user.first_name,
+      last_name: last_name || user.last_name,
       email: email || user.email,
       password: hashedPassword,
       profile_image: profileImagePath,
