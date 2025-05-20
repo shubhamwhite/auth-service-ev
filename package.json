@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node index.js",
+    "test": "echo \"No tests yet\" && exit 0",
     "dev": "node --watch index.js",
     "prepare": "husky",
     "lint": "eslint .",

@@ -1,0 +1,21 @@
+1. Install Husky & Commitlint (you already did):
+npm install husky @commitlint/cli @commitlint/config-conventional --save-dev
+
+
+2. Enable hooks:
+npx husky install
+
+
+3. Add hooks:
+npx husky add .husky/pre-commit "npx lint-staged"
+npx husky add .husky/commit-msg "npx --no-install commitlint --edit \$1"
+
+
+4. .husky/pre-commit
+#!/bin/sh
+npx lint-staged
+
+
+5. .husky/commit-msg
+#!/bin/sh
+npx --no-install commitlint --edit "$1"
