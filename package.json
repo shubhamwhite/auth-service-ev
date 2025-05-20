@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node test.js",
+    "test": "node index.js",
     "dev": "node --watch index.js",
     "prepare": "husky",
     "lint": "eslint .",
@@ -16,6 +16,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "amqplib": "^0.10.8",
     "bcryptjs": "^3.0.2",
     "cli-color": "^2.0.4",
     "cookie-parser": "^1.4.7",

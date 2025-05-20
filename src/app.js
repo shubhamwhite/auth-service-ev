@@ -4,15 +4,12 @@ const cors = require('cors')
 const cookieParser = require('cookie-parser')
 const path = require('path')
 
-
 const corsOptions = {
   origin: 'http://localhost:3005', // Replace with your frontend URL
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }
-
-
 
 // Middleware
 app.use(cors(corsOptions))

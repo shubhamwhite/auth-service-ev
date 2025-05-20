@@ -16,6 +16,7 @@ export default defineConfig([
           varsIgnorePattern: '^_'
         }
       ],
+      'no-multiple-empty-lines': ['error', { max: 1, maxEOF: 0 }], // Disallow multiple empty lines
       'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'off',
       eqeqeq: ['error', 'always'], // Enforce strict equality (===)
       curly: ['error', 'all'], // Require curly braces for all control blocks

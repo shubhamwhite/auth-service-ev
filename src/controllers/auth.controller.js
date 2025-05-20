@@ -4,20 +4,78 @@ const config = require('../config')
 const { deleteImage } = require('../helper/imageUpload.helper')
 const { generateOTP } = require('../utils/generateOTP')
 const { responder } = require('../constant/response')
-const sendOtpToEmail = require('../service/emailProvider')
 const generateToken = require('../utils/generateToken')
 const { OAuth2Client } = require('google-auth-library')
+const { connectRabbitMQ, getChannel } = require('../service/rabbitmq.service')
 const CustomErrorHandler = require('../utils/CustomError')
 const bcrypt = require('bcryptjs')
 const URL = require('../constant/url')
 const fs = require('fs')
 const path = require('path')
 
+// exports.signup = async (req, res, next) => {
+//   try {
+//     const { first_name, last_name, email, password } = req.body
+
+//     // Handle optional profile image
+//     const profileImagePath =
+//       req.file && req.file.filename
+//         ? `/uploads/${req.file.filename}`
+//         : '/uploads/user.png'
+
+//     const existingUser = await _User.findOne({ where: { email } })
+
+//     if (existingUser) {
+//       if (req.file && req.file.filename) {
+//         deleteImage(req.file.filename)
+//       }
+//       return next(CustomErrorHandler.alreadyExist('User already exists'))
+//     }
+
+//     const hashedPassword = await bcrypt.hash(password, 10)
+//     const otp = generateOTP(6)
+
+//     const newUser = await _User.create({
+//       first_name,
+//       last_name,
+//       email,
+//       password: hashedPassword,
+//       verification_otp: otp,
+//       is_verified: false,
+//       otp_expires_at: new Date(Date.now() + 10 * 60 * 1000),
+//       profile_image: profileImagePath
+//     })
+
+//     const { password: _, ...user } = newUser.dataValues
+
+//     await sendOtpToEmail(email, otp)
+
+//     const token = generateToken({ id: newUser.id, email: newUser.email })
+//     res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true })
+
+//     user.profile_image = `${URL.BASE}${user.profile_image}`
+
+//     return responder(
+//       res,
+//       201,
+//       'User created successfully. Check your email for OTP verification',
+//       {
+//         user,
+//         token
+//       }
+//     )
+//   } catch (err) {
+//     if (req.file && req.file.filename) {
+//       deleteImage(req.file.filename)
+//     }
+//     console.error('Error in signup:', err)
+//     return next(err)
+//   }
+// }
+
 exports.signup = async (req, res, next) => {
   try {
     const { first_name, last_name, email, password } = req.body
-
-    // Handle optional profile image
     const profileImagePath =
       req.file && req.file.filename
         ? `/uploads/${req.file.filename}`
@@ -26,7 +84,7 @@ exports.signup = async (req, res, next) => {
     const existingUser = await _User.findOne({ where: { email } })
 
     if (existingUser) {
-      if (req.file && req.file.filename) {
+      if (req.file?.filename) {
         deleteImage(req.file.filename)
       }
       return next(CustomErrorHandler.alreadyExist('User already exists'))
@@ -48,11 +106,14 @@ exports.signup = async (req, res, next) => {
 
     const { password: _, ...user } = newUser.dataValues
 
-    await sendOtpToEmail(email, otp)
+    const channel = getChannel() || (await connectRabbitMQ())
+    const emailJob = { email, otp, name: first_name, flag: 'verify' }
+    channel.sendToQueue('emailQueue', Buffer.from(JSON.stringify(emailJob)), {
+      persistent: true
+    })
 
     const token = generateToken({ id: newUser.id, email: newUser.email })
-    res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true })
-
+    res.cookie('token', token, { maxAge: 86400000, httpOnly: true })
     user.profile_image = `${URL.BASE}${user.profile_image}`
 
     return responder(
@@ -142,43 +203,101 @@ exports.login = async (req, res, next) => {
   }
 }
 
+// exports.resendOtpOrForgotPassword = async (req, res, next) => {
+//   try {
+//     const { email, flag } = req.body
+
+//     // Basic validation
+//     if (!email) {
+//       return responder(res, 400, 'Email is required')
+//     }
+
+//     // Fetch user
+//     const user = await _User.findOne({ where: { email } })
+//     if (!user) {
+//       return responder(res, 404, 'User not found')
+//     }
+
+//     // OTP generation logic
+//     const generateAndSendOtp = async (message) => {
+//       const otp = generateOTP(6)
+//       user.verification_otp = otp
+//       user.otp_expires_at = new Date(Date.now() + 10 * 60 * 1000) // expires in 10 minutes
+//       await user.save()
+//       await sendOtpToEmail(email, otp, user.name, flag)
+//       return responder(res, 200, message)
+//     }
+
+//     // Handle different flags
+//     switch (flag) {
+//     case 'forgot_password':
+//       return await generateAndSendOtp('OTP sent for password reset')
+
+//     case 'resend_otp':
+//       if (user.is_verified) {
+//         return responder(res, 400, 'User is already verified')
+//       }
+//       return await generateAndSendOtp('OTP resent successfully')
+
+//     default:
+//       return responder(res, 400, 'Invalid flag provided')
+//     }
+//   } catch (err) {
+//     console.error('Error in handleOtpRequest:', err)
+//     return next(err)
+//   }
+// }
+
 exports.resendOtpOrForgotPassword = async (req, res, next) => {
   try {
     const { email, flag } = req.body
 
-    // Basic validation
-    if (!email) {return responder(res, 400, 'Email is required')}
+    if (!email || !flag) {
+      return responder(res, 400, 'Email and flag are required')
+    }
 
-    // Fetch user
     const user = await _User.findOne({ where: { email } })
-    if (!user) {return responder(res, 404, 'User not found')}
 
-    // OTP generation logic
-    const generateAndSendOtp = async (message) => {
+    if (!user) {
+      return responder(res, 404, 'User not found')
+    }
+
+    const generateAndQueueOtp = async (message) => {
       const otp = generateOTP(6)
       user.verification_otp = otp
-      user.otp_expires_at = new Date(Date.now() + 10 * 60 * 1000) // expires in 10 minutes
+      user.otp_expires_at = new Date(Date.now() + 10 * 60 * 1000)
       await user.save()
-      await sendOtpToEmail(email, otp, user.name, flag)
+
+      const channel = getChannel() || (await connectRabbitMQ())
+      const emailJob = {
+        email,
+        otp,
+        name: user.first_name,
+        flag // 'verify' or 'forgot_password'
+      }
+
+      channel.sendToQueue('emailQueue', Buffer.from(JSON.stringify(emailJob)), {
+        persistent: true
+      })
+
       return responder(res, 200, message)
     }
 
-    // Handle different flags
     switch (flag) {
     case 'forgot_password':
-      return await generateAndSendOtp('OTP sent for password reset')
+      return await generateAndQueueOtp('OTP sent for password reset')
 
     case 'resend_otp':
       if (user.is_verified) {
         return responder(res, 400, 'User is already verified')
       }
-      return await generateAndSendOtp('OTP resent successfully')
+      return await generateAndQueueOtp('OTP resent successfully')
 
     default:
       return responder(res, 400, 'Invalid flag provided')
     }
   } catch (err) {
-    console.error('Error in handleOtpRequest:', err)
+    console.error('Error in resendOtpOrForgotPassword:', err)
     return next(err)
   }
 }
@@ -292,12 +411,16 @@ exports.updateUser = async (req, res, next) => {
 
     const user = await _User.findByPk(userId)
     if (!user) {
-      if (req.file && req.file.filename) {deleteImage(req.file.filename)}
+      if (req.file && req.file.filename) {
+        deleteImage(req.file.filename)
+      }
       return next(CustomErrorHandler.notFound('User not found'))
     }
 
     if (!user.is_verified) {
-      if (req.file && req.file.filename) {deleteImage(req.file.filename)}
+      if (req.file && req.file.filename) {
+        deleteImage(req.file.filename)
+      }
       return next(
         CustomErrorHandler.unprocessableEntity(
           'Please verify your account before updating profile'
