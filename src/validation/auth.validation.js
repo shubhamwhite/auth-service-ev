@@ -1,5 +1,3 @@
-// middleware/signupValidation.middleware.js
-
 const Joi = require('joi')
 
 const signupValidationSchema = (req, res, next) => {
