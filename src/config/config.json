@@ -5,6 +5,7 @@
     "database": "crystal-event",
     "host": "127.0.0.1",
     "dialect": "postgres",
+    "logging": false,
     "pool": {
       "max": 5,
       "min": 0,

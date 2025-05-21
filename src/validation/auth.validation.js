@@ -40,4 +40,24 @@ const signupValidationSchema = (req, res, next) => {
   next()
 }
 
-module.exports = signupValidationSchema
+const loginValidationSchema = (req, res, next) => {
+  const schema = Joi.object({
+    email: Joi.string().email().required().messages({
+      'string.email': 'Invalid email format',
+      'string.empty': 'Email is required'
+    }),
+    password: Joi.string().required().messages({
+      'string.empty': 'Password is required'
+    })
+  })
+
+  const { error } = schema.validate(req.body, { abortEarly: false })
+
+  if (error) {
+    return next(error)
+  }
+
+  next()
+}
+
+module.exports = { signupValidationSchema, loginValidationSchema }

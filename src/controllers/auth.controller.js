@@ -9,69 +9,9 @@ const { OAuth2Client } = require('google-auth-library')
 const { connectRabbitMQ, getChannel } = require('../service/rabbitmq.service')
 const CustomErrorHandler = require('../utils/CustomError')
 const bcrypt = require('bcryptjs')
-const URL = require('../constant/url')
+const { URL } = require('../constant/app.constant')
 const fs = require('fs')
 const path = require('path')
-
-// exports.signup = async (req, res, next) => {
-//   try {
-//     const { first_name, last_name, email, password } = req.body
-
-//     // Handle optional profile image
-//     const profileImagePath =
-//       req.file && req.file.filename
-//         ? `/uploads/${req.file.filename}`
-//         : '/uploads/user.png'
-
-//     const existingUser = await _User.findOne({ where: { email } })
-
-//     if (existingUser) {
-//       if (req.file && req.file.filename) {
-//         deleteImage(req.file.filename)
-//       }
-//       return next(CustomErrorHandler.alreadyExist('User already exists'))
-//     }
-
-//     const hashedPassword = await bcrypt.hash(password, 10)
-//     const otp = generateOTP(6)
-
-//     const newUser = await _User.create({
-//       first_name,
-//       last_name,
-//       email,
-//       password: hashedPassword,
-//       verification_otp: otp,
-//       is_verified: false,
-//       otp_expires_at: new Date(Date.now() + 10 * 60 * 1000),
-//       profile_image: profileImagePath
-//     })
-
-//     const { password: _, ...user } = newUser.dataValues
-
-//     await sendOtpToEmail(email, otp)
-
-//     const token = generateToken({ id: newUser.id, email: newUser.email })
-//     res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true })
-
-//     user.profile_image = `${URL.BASE}${user.profile_image}`
-
-//     return responder(
-//       res,
-//       201,
-//       'User created successfully. Check your email for OTP verification',
-//       {
-//         user,
-//         token
-//       }
-//     )
-//   } catch (err) {
-//     if (req.file && req.file.filename) {
-//       deleteImage(req.file.filename)
-//     }
-//     console.error('Error in signup:', err)
-//     return next(err)
-//   }
-// }
 
 exports.signup = async (req, res, next) => {
   try {
@@ -100,7 +40,7 @@ exports.signup = async (req, res, next) => {
       password: hashedPassword,
       verification_otp: otp,
       is_verified: false,
-      otp_expires_at: new Date(Date.now() + 10 * 60 * 1000),
+      otp_expires_at: new Date(Date.now() + 1 * 60 * 1000),
       profile_image: profileImagePath
     })
 
@@ -203,51 +143,6 @@ exports.login = async (req, res, next) => {
   }
 }
 
-// exports.resendOtpOrForgotPassword = async (req, res, next) => {
-//   try {
-//     const { email, flag } = req.body
-
-//     // Basic validation
-//     if (!email) {
-//       return responder(res, 400, 'Email is required')
-//     }
-
-//     // Fetch user
-//     const user = await _User.findOne({ where: { email } })
-//     if (!user) {
-//       return responder(res, 404, 'User not found')
-//     }
-
-//     // OTP generation logic
-//     const generateAndSendOtp = async (message) => {
-//       const otp = generateOTP(6)
-//       user.verification_otp = otp
-//       user.otp_expires_at = new Date(Date.now() + 10 * 60 * 1000) // expires in 10 minutes
-//       await user.save()
-//       await sendOtpToEmail(email, otp, user.name, flag)
-//       return responder(res, 200, message)
-//     }
-
-//     // Handle different flags
-//     switch (flag) {
-//     case 'forgot_password':
-//       return await generateAndSendOtp('OTP sent for password reset')
-
-//     case 'resend_otp':
-//       if (user.is_verified) {
-//         return responder(res, 400, 'User is already verified')
-//       }
-//       return await generateAndSendOtp('OTP resent successfully')
-
-//     default:
-//       return responder(res, 400, 'Invalid flag provided')
-//     }
-//   } catch (err) {
-//     console.error('Error in handleOtpRequest:', err)
-//     return next(err)
-//   }
-// }
-
 exports.resendOtpOrForgotPassword = async (req, res, next) => {
   try {
     const { email, flag } = req.body
@@ -265,7 +160,7 @@ exports.resendOtpOrForgotPassword = async (req, res, next) => {
     const generateAndQueueOtp = async (message) => {
       const otp = generateOTP(6)
       user.verification_otp = otp
-      user.otp_expires_at = new Date(Date.now() + 10 * 60 * 1000)
+      user.otp_expires_at = new Date(Date.now() + 1 * 60 * 1000)
       await user.save()
 
       const channel = getChannel() || (await connectRabbitMQ())
@@ -358,7 +253,6 @@ exports.getUser = async (req, res, next) => {
       attributes: ['id', 'first_name', 'last_name', 'email', 'profile_image']
     })
 
-    console.log('user___++++++++++++', user.profile_image)
     const imagePath = user.profile_image
     const split = imagePath.split('/')
     const fileName = split[split.length - 1]

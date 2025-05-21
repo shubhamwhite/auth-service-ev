@@ -51,6 +51,9 @@ module.exports = {
         type: Sequelize.ENUM('manual', 'google'),
         allowNull: false,
         defaultValue: 'manual'
+      },
+      block: {
+        type: Sequelize.BOOLEAN
       }
     })
   },

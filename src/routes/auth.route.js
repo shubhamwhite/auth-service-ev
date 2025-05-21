@@ -13,11 +13,11 @@ const {
 const { upload } = require('../helper/imageUpload.helper')
 const authMiddleware = require('../middleware/auth.middleware')
 const errorHandler = require('../middleware/errorHandler.middleware')
-const signupValidationSchema = require('../validation/auth.validation')
+const { signupValidationSchema, loginValidationSchema } = require('../validation/auth.validation')
 const swaggerUi = require('swagger-ui-express')
 const swaggerSpec = require('../../docs/swagger')
 
-router.route('/login').post(login)
+router.route('/login').post(loginValidationSchema, login)
 router.route('/signup').post(upload.single('profile_image'), signupValidationSchema, signup)
 router.route('/verify-otp').post(verifyOtp)
 router.route('/password/resend-otp').post(resendOtpOrForgotPassword)
