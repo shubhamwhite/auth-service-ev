@@ -435,11 +435,26 @@ exports.googleLogin = async (req, res, next) => {
 
     const token = generateToken({ id: user.id, email: user.email })
 
-    res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true })
+    res.cookie('token', token, {
+      maxAge: 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None'
+    })
 
     return responder(res, 200, 'Google login successful', { userData, token })
   } catch (err) {
     console.error('Error in Google login:', err)
     return next(err)
   }
+}
+
+exports.googleLogout = (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    sameSite: 'Lax', // adjust as needed based on your frontend/backend setup
+    secure: process.env.NODE_ENV === 'production' // true in production with HTTPS
+  })
+
+  return responder(res, 200, 'Logout successful')
 }

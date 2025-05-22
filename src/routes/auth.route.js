@@ -8,8 +8,10 @@ const {
   logout,
   getUser,
   updateUser,
-  googleLogin
+  googleLogin,
+  googleLogout
 } = require('../controllers/auth.controller')
+
 const { upload } = require('../helper/imageUpload.helper')
 const authMiddleware = require('../middleware/auth.middleware')
 const errorHandler = require('../middleware/errorHandler.middleware')
@@ -26,8 +28,9 @@ router.route('/logout').get(logout)
 router.route('/:id').get(authMiddleware, getUser)
 router.route('/:id').patch(authMiddleware, upload.single('profile_image'), updateUser)
 router.route('/google-login').post(googleLogin)
+router.route('/google-logout').get(googleLogout)
 
-router.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec)) // localhost:4000/api/v1/auth/api-docs
+router.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
 router.use(errorHandler)
 
