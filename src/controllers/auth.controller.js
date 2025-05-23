@@ -13,67 +13,6 @@ const { URL } = require('../constant/app.constant')
 const fs = require('fs')
 const path = require('path')
 
-// exports.signup = async (req, res, next) => {
-//   try {
-//     const { first_name, last_name, email, password } = req.body
-//     const profileImagePath =
-//       req.file && req.file.filename
-//         ? `/uploads/${req.file.filename}`
-//         : '/uploads/user.png'
-
-//     const existingUser = await _User.findOne({ where: { email } })
-
-//     if (existingUser) {
-//       if (req.file?.filename) {
-//         deleteImage(req.file.filename)
-//       }
-//       return next(CustomErrorHandler.alreadyExist('User already exists'))
-//     }
-
-//     const hashedPassword = await bcrypt.hash(password, 10)
-//     const otp = generateOTP(6)
-
-//     const newUser = await _User.create({
-//       first_name,
-//       last_name,
-//       email,
-//       password: hashedPassword,
-//       verification_otp: otp,
-//       is_verified: false,
-//       otp_expires_at: new Date(Date.now() + 1 * 60 * 1000),
-//       profile_image: profileImagePath
-//     })
-
-//     const { password: _, ...user } = newUser.dataValues
-
-//     const channel = getChannel() || (await connectRabbitMQ())
-//     const emailJob = { email, otp, name: first_name, flag: 'verify' }
-//     channel.sendToQueue('emailQueue', Buffer.from(JSON.stringify(emailJob)), {
-//       persistent: true
-//     })
-
-//     const token = generateToken({ id: newUser.id, email: newUser.email })
-//     res.cookie('token', token, { maxAge: 86400000, httpOnly: true })
-//     user.profile_image = `${URL.BASE}${user.profile_image}`
-
-//     return responder(
-//       res,
-//       201,
-//       'User created successfully. Check your email for OTP verification',
-//       {
-//         user,
-//         token
-//       }
-//     )
-//   } catch (err) {
-//     if (req.file && req.file.filename) {
-//       deleteImage(req.file.filename)
-//     }
-//     console.error('Error in signup:', err)
-//     return next(err)
-//   }
-// }
-
 exports.signup = async (req, res, next) => {
   try {
     const { first_name, last_name, email, password, role } = req.body
@@ -108,7 +47,9 @@ exports.signup = async (req, res, next) => {
       is_verified: false,
       otp_expires_at: new Date(Date.now() + 1 * 60 * 1000),
       profile_image: profileImagePath,
-      role: userRole // set role here
+      role: userRole,
+      ip_address: req.metadata.ip_address,
+      user_agent: req.metadata.user_agent
     })
 
     const { password: _, ...user } = newUser.dataValues
@@ -137,6 +78,149 @@ exports.signup = async (req, res, next) => {
       deleteImage(req.file.filename)
     }
     console.error('Error in signup:', err)
+    return next(err)
+  }
+}
+
+exports.login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body
+
+    if (!email || !password) {
+      return responder(res, 400, 'Email and password are required')
+    }
+
+    const user = await _User.findOne({ where: { email } })
+
+    if (!user) {
+      return responder(res, 404, 'User not found')
+    }
+
+    if (!user.is_verified) {
+      return responder(res, 403, 'User is not verified')
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password)
+
+    if (!isPasswordValid) {
+      return responder(res, 401, 'Invalid email and password')
+    }
+
+    if (user.role !== 'user' && user.role !== 'company') {
+      return responder(res, 403, 'Role not allowed to login')
+    }
+
+    // ✅ Fix: update using the instance
+    await user.update({
+      last_login_ip: req.metadata?.last_login_ip || req.ip,
+      user_agent: req.metadata?.user_agent || req.headers['user-agent']
+    })
+
+    user.profile_image = `${URL.BASE}${user.profile_image}`
+    const { password: _, ...userData } = user.dataValues
+
+    const token = generateToken({ id: user.id, email: user.email, role: user.role })
+    res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true })
+
+    return responder(res, 200, 'Login successful', { userData, token })
+  } catch (err) {
+    console.error('Error in login:', err)
+    return next(err)
+  }
+}
+
+exports.googleLogin = async (req, res, next) => {
+  const client = new OAuth2Client(config.get('GOOGLE_CLIENT_ID')) // from .env
+  try {
+    const { idToken, role } = req.body
+
+    if (!idToken) {
+      return responder(res, 400, 'ID Token is required')
+    }
+
+    const allowedRoles = ['user', 'company']
+    const userRole = allowedRoles.includes(role) ? role : 'user'
+
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: config.get('GOOGLE_CLIENT_ID')
+    })
+
+    const payload = ticket.getPayload()
+    const { sub: google_id, email, given_name, family_name, picture } = payload
+
+    let user = await _User.findOne({ where: { google_id } })
+
+    if (user) {
+      if (user.role !== userRole) {
+        return responder(
+          res,
+          403,
+          `You are registered as a '${user.role}'. Please login using the correct role.`
+        )
+      }
+
+      // ✅ Update last_login_ip and user_agent on repeat login
+      await user.update({
+        last_login_ip: req.metadata?.last_login_ip || req.ip,
+        user_agent: req.metadata?.user_agent || req.headers['user-agent']
+      })
+    } else {
+      const emailExists = await _User.findOne({ where: { email } })
+      if (emailExists) {
+        return responder(
+          res,
+          409,
+          'Email is already registered with manual login'
+        )
+      }
+
+      user = await _User.create({
+        first_name: given_name,
+        last_name: family_name,
+        email,
+        profile_image: picture,
+        google_id,
+        is_verified: true,
+        login_type: 'google',
+        password: 'not_required',
+        role: userRole,
+        ip_address: req.metadata?.ip_address || req.ip,
+        user_agent: req.metadata?.user_agent || req.headers['user-agent'],
+        last_login_ip: req.metadata?.last_login_ip || req.ip
+      })
+    }
+
+    const { password: _, ...userData } = user.dataValues
+
+    const token = generateToken({ id: user.id, email: user.email, role: user.role })
+
+    res.cookie('token', token, {
+      maxAge: 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None'
+    })
+
+    return responder(res, 200, 'Google login successful', { userData, token })
+  } catch (err) {
+    console.error('Error in Google login:', err)
+    return next(err)
+  }
+}
+
+exports.googleLogout = (req, res, next) => {
+  try {
+    res.clearCookie('token', {
+      httpOnly: true,
+      sameSite: 'Lax', // adjust as needed based on your frontend/backend setup
+      secure: process.env.NODE_ENV === 'production' // true in production with HTTPS
+    })
+
+    return responder(res, 200, 'Logout successful')
+
+  } catch (err) {
+    console.error('Error in verifyOtp:', err)
     return next(err)
   }
 }
@@ -170,85 +254,6 @@ exports.verifyOtp = async (req, res, next) => {
     return responder(res, 200, 'User verified successfully', data)
   } catch (err) {
     console.error('Error in verifyOtp:', err)
-    return next(err)
-  }
-}
-
-// exports.login = async (req, res, next) => {
-//   try {
-//     const { email, password } = req.body
-
-//     if (!email || !password) {
-//       return responder(res, 400, 'Email and password are required')
-//     }
-
-//     const user = await _User.findOne({ where: { email } })
-
-//     if (!user) {
-//       return responder(res, 404, 'User not found')
-//     }
-
-//     if (!user.is_verified) {
-//       return responder(res, 403, 'User is not verified')
-//     }
-
-//     const isPasswordValid = await bcrypt.compare(password, user.password)
-
-//     if (!isPasswordValid) {
-//       return responder(res, 401, 'Invalid email and password')
-//     }
-
-//     const { password: _, ...userData } = user.dataValues
-
-//     const token = generateToken({ id: user.id, email: user.email })
-//     res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true })
-
-//     return responder(res, 200, 'Login successful', { userData, token })
-//   } catch (err) {
-//     console.error('Error in login:', err)
-//     return next(err)
-//   }
-// }
-
-exports.login = async (req, res, next) => {
-  try {
-    const { email, password } = req.body
-
-    if (!email || !password) {
-      return responder(res, 400, 'Email and password are required')
-    }
-
-    const user = await _User.findOne({ where: { email } })
-
-    if (!user) {
-      return responder(res, 404, 'User not found')
-    }
-
-    if (!user.is_verified) {
-      return responder(res, 403, 'User is not verified')
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password)
-
-    if (!isPasswordValid) {
-      return responder(res, 401, 'Invalid email and password')
-    }
-
-    // You can add role-based restrictions here if needed, e.g.:
-    if (user.role !== 'user' && user.role !== 'company') {
-      return responder(res, 403, 'Role not allowed to login')
-    }
-
-    user.profile_image = `${URL.BASE}${user.profile_image}` // Ensure profile_image is set correctly
-    const { password: _, ...userData } = user.dataValues
-
-    // Include role in the token payload
-    const token = generateToken({ id: user.id, email: user.email, role: user.role })
-    res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true })
-
-    return responder(res, 200, 'Login successful', { userData, token })
-  } catch (err) {
-    console.error('Error in login:', err)
     return next(err)
   }
 }
@@ -409,93 +414,6 @@ exports.getUser = async (req, res, next) => {
   }
 }
 
-// exports.updateUser = async (req, res, next) => {
-//   try {
-//     const userId = req.params.id
-//     const { first_name, last_name, email, password, otp } = req.body
-
-//     const user = await _User.findByPk(userId)
-//     if (!user) {
-//       if (req.file && req.file.filename) {
-//         deleteImage(req.file.filename)
-//       }
-//       return next(CustomErrorHandler.notFound('User not found'))
-//     }
-
-//     if (!user.is_verified) {
-//       if (req.file && req.file.filename) {
-//         deleteImage(req.file.filename)
-//       }
-//       return next(
-//         CustomErrorHandler.unprocessableEntity(
-//           'Please verify your account before updating profile'
-//         )
-//       )
-//     }
-
-//     // Handle profile image update
-//     let profileImagePath = user.profile_image
-
-//     if (req.file && req.file.filename) {
-//       // Delete old image if it's not the default one
-//       if (user.profile_image && !user.profile_image.includes('user.png')) {
-//         const oldImage = user.profile_image.split('/').pop() // get filename only
-//         deleteImage(oldImage) // delete old file
-//       }
-
-//       // Set new profile image path
-//       profileImagePath = `/uploads/${req.file.filename}`
-//     }
-
-//     // Handle password update ONLY if OTP is provided and valid
-//     let hashedPassword = user.password
-//     if (password) {
-//       if (!otp) {
-//         return next(
-//           CustomErrorHandler.unprocessableEntity(
-//             'OTP is required to update password'
-//           )
-//         )
-//       }
-//       if (
-//         user.verification_otp !== otp ||
-//         new Date(user.otp_expires_at) < new Date()
-//       ) {
-//         return next(
-//           CustomErrorHandler.unprocessableEntity('Invalid or expired OTP')
-//         )
-//       }
-
-//       hashedPassword = await bcrypt.hash(password, 10)
-
-//       // clear OTP fields
-//       user.verification_otp = null
-//       user.otp_expires_at = null
-//     }
-
-//     await user.update({
-//       first_name: first_name || user.first_name,
-//       last_name: last_name || user.last_name,
-//       email: email || user.email,
-//       password: hashedPassword,
-//       profile_image: profileImagePath,
-//       verification_otp: user.verification_otp,
-//       otp_expires_at: user.otp_expires_at
-//     })
-
-//     const { password: _, ...updatedUser } = user.dataValues
-//     updatedUser.profile_image = `${URL.BASE}${updatedUser.profile_image}`
-
-//     return responder(res, 200, 'User updated successfully', updatedUser)
-//   } catch (err) {
-//     if (req.file && req.file.filename) {
-//       deleteImage(req.file.filename)
-//     }
-//     console.error('Error in updateUser:', err)
-//     return next(err)
-//   }
-// }
-
 exports.updateUser = async (req, res, next) => {
   try {
     const userId = req.params.id
@@ -580,154 +498,4 @@ exports.updateUser = async (req, res, next) => {
     console.error('Error in updateUser:', err)
     return next(err)
   }
-}
-
-// exports.googleLogin = async (req, res, next) => {
-//   const client = new OAuth2Client(config.get('GOOGLE_CLIENT_ID')) // from .env
-//   try {
-//     const { idToken } = req.body
-
-//     if (!idToken) {
-//       return responder(res, 400, 'ID Token is required')
-//     }
-
-//     // Verify token with Google
-//     const ticket = await client.verifyIdToken({
-//       idToken,
-//       audience: config.get('GOOGLE_CLIENT_ID')
-//     })
-
-//     const payload = ticket.getPayload()
-
-//     const { sub: google_id, email, given_name, family_name, picture } = payload
-
-//     // Check if user already exists
-//     let user = await _User.findOne({ where: { google_id } })
-
-//     if (!user) {
-//       const emailExists = await _User.findOne({ where: { email } })
-//       if (emailExists) {
-//         return responder(
-//           res,
-//           409,
-//           'Email is already registered with manual login'
-//         )
-//       }
-
-//       // Create new user
-//       user = await _User.create({
-//         first_name: given_name,
-//         last_name: family_name,
-//         email,
-//         profile_image: picture,
-//         google_id,
-//         is_verified: true,
-//         login_type: 'google',
-//         password: 'not_required'
-//       })
-//     }
-
-//     const { password: _, ...userData } = user.dataValues
-
-//     const token = generateToken({ id: user.id, email: user.email })
-
-//     res.cookie('token', token, {
-//       maxAge: 24 * 60 * 60 * 1000,
-//       httpOnly: true,
-//       secure: true,
-//       sameSite: 'None'
-//     })
-
-//     return responder(res, 200, 'Google login successful', { userData, token })
-//   } catch (err) {
-//     console.error('Error in Google login:', err)
-//     return next(err)
-//   }
-// }
-
-exports.googleLogin = async (req, res, next) => {
-  const client = new OAuth2Client(config.get('GOOGLE_CLIENT_ID')) // from .env
-  try {
-    const { idToken, role } = req.body
-
-    if (!idToken) {
-      return responder(res, 400, 'ID Token is required')
-    }
-
-    // Validate role
-    const allowedRoles = ['user', 'company']
-    const userRole = allowedRoles.includes(role) ? role : 'user' // fallback to user
-
-    // Verify token with Google
-    const ticket = await client.verifyIdToken({
-      idToken,
-      audience: config.get('GOOGLE_CLIENT_ID')
-    })
-
-    const payload = ticket.getPayload()
-    const { sub: google_id, email, given_name, family_name, picture } = payload
-
-    // Check if user already exists by google_id
-    let user = await _User.findOne({ where: { google_id } })
-
-    if (user) {
-      // User exists, check if role matches the login attempt
-      if (user.role !== userRole) {
-        return responder(
-          res,
-          403,
-          `You are registered as a '${user.role}'. Please login using the correct role.`
-        )
-      }
-    } else {
-      // If no user by google_id, check if email exists (manual login)
-      const emailExists = await _User.findOne({ where: { email } })
-      if (emailExists) {
-        return responder(
-          res,
-          409,
-          'Email is already registered with manual login'
-        )
-      }
-
-      // Create new user with the provided role
-      user = await _User.create({
-        first_name: given_name,
-        last_name: family_name,
-        email,
-        profile_image: picture,
-        google_id,
-        is_verified: true,
-        login_type: 'google',
-        password: 'not_required',
-        role: userRole
-      })
-    }
-
-    const { password: _, ...userData } = user.dataValues
-
-    const token = generateToken({ id: user.id, email: user.email, role: user.role })
-
-    res.cookie('token', token, {
-      maxAge: 24 * 60 * 60 * 1000,
-      httpOnly: true,
-      secure: true,
-      sameSite: 'None'
-    })
-
-    return responder(res, 200, 'Google login successful', { userData, token })
-  } catch (err) {
-    console.error('Error in Google login:', err)
-    return next(err)
-  }
-}
-
-exports.googleLogout = (req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    sameSite: 'Lax', // adjust as needed based on your frontend/backend setup
-    secure: process.env.NODE_ENV === 'production' // true in production with HTTPS
-  })
-
-  return responder(res, 200, 'Logout successful')
 }

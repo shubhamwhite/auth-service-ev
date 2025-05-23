@@ -66,12 +66,25 @@ module.exports = (sequelize) => {
         type: DataTypes.BOOLEAN,
         defaultValue: false
       },
-
-      // NEW role field
       role: {
         type: DataTypes.ENUM('user', 'company', 'admin'),
         allowNull: false,
         defaultValue: 'user'
+      },
+      ip_address: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'IP address during registration or last update'
+      },
+      last_login_ip: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'IP address during the last login'
+      },
+      user_agent: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'User-Agent header string'
       }
     },
     {

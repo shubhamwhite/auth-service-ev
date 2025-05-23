@@ -1,5 +1,3 @@
-'use strict'
-/** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable('Users', {
@@ -54,11 +52,25 @@ module.exports = {
       block: {
         type: Sequelize.BOOLEAN
       },
-      // NEW role column
       role: {
         type: Sequelize.ENUM('user', 'company', 'admin'),
         allowNull: false,
         defaultValue: 'user'
+      },
+      ip_address: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        comment: 'IP address during registration or last update'
+      },
+      last_login_ip: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        comment: 'IP address during the last login'
+      },
+      user_agent: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        comment: 'User-Agent header string'
       }
     })
   },
