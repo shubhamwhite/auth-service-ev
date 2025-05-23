@@ -60,7 +60,11 @@ exports.signup = async (req, res, next) => {
       persistent: true
     })
 
-    const token = generateToken({ id: newUser.id, email: newUser.email, role: userRole })
+    const token = generateToken({
+      id: newUser.id,
+      email: newUser.email,
+      role: userRole
+    })
     res.cookie('token', token, { maxAge: 86400000, httpOnly: true })
     user.profile_image = `${URL.BASE}${user.profile_image}`
 
@@ -119,7 +123,11 @@ exports.login = async (req, res, next) => {
     user.profile_image = `${URL.BASE}${user.profile_image}`
     const { password: _, ...userData } = user.dataValues
 
-    const token = generateToken({ id: user.id, email: user.email, role: user.role })
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      role: user.role
+    })
     res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true })
 
     return responder(res, 200, 'Login successful', { userData, token })
@@ -193,7 +201,11 @@ exports.googleLogin = async (req, res, next) => {
 
     const { password: _, ...userData } = user.dataValues
 
-    const token = generateToken({ id: user.id, email: user.email, role: user.role })
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+      role: user.role
+    })
 
     res.cookie('token', token, {
       maxAge: 24 * 60 * 60 * 1000,
@@ -218,7 +230,6 @@ exports.googleLogout = (req, res, next) => {
     })
 
     return responder(res, 200, 'Logout successful')
-
   } catch (err) {
     console.error('Error in verifyOtp:', err)
     return next(err)
@@ -421,12 +432,16 @@ exports.updateUser = async (req, res, next) => {
 
     const user = await _User.findByPk(userId)
     if (!user) {
-      if (req.file && req.file.filename) {deleteImage(req.file.filename)}
+      if (req.file && req.file.filename) {
+        deleteImage(req.file.filename)
+      }
       return next(CustomErrorHandler.notFound('User not found'))
     }
 
     if (!user.is_verified) {
-      if (req.file && req.file.filename) {deleteImage(req.file.filename)}
+      if (req.file && req.file.filename) {
+        deleteImage(req.file.filename)
+      }
       return next(
         CustomErrorHandler.unprocessableEntity(
           'Please verify your account before updating profile'
@@ -435,7 +450,9 @@ exports.updateUser = async (req, res, next) => {
     }
 
     if (user.block) {
-      if (req.file && req.file.filename) {deleteImage(req.file.filename)}
+      if (req.file && req.file.filename) {
+        deleteImage(req.file.filename)
+      }
       return next(CustomErrorHandler.forbidden('Your account is blocked'))
     }
 
@@ -445,9 +462,13 @@ exports.updateUser = async (req, res, next) => {
         (user.role === 'user' && role === 'company') ||
         (user.role === 'company' && role === 'user')
       ) {
-        if (req.file && req.file.filename) {deleteImage(req.file.filename)}
+        if (req.file && req.file.filename) {
+          deleteImage(req.file.filename)
+        }
         return next(
-          CustomErrorHandler.forbidden('Switching between user and company role is not allowed')
+          CustomErrorHandler.forbidden(
+            'Switching between user and company role is not allowed'
+          )
         )
       }
     }
@@ -466,12 +487,25 @@ exports.updateUser = async (req, res, next) => {
     let hashedPassword = user.password
     if (password) {
       if (!otp) {
-        if (req.file && req.file.filename) {deleteImage(req.file.filename)}
-        return next(CustomErrorHandler.unprocessableEntity('OTP is required to update password'))
+        if (req.file && req.file.filename) {
+          deleteImage(req.file.filename)
+        }
+        return next(
+          CustomErrorHandler.unprocessableEntity(
+            'OTP is required to update password'
+          )
+        )
       }
-      if (user.verification_otp !== otp || new Date(user.otp_expires_at) < new Date()) {
-        if (req.file && req.file.filename) {deleteImage(req.file.filename)}
-        return next(CustomErrorHandler.unprocessableEntity('Invalid or expired OTP'))
+      if (
+        user.verification_otp !== otp ||
+        new Date(user.otp_expires_at) < new Date()
+      ) {
+        if (req.file && req.file.filename) {
+          deleteImage(req.file.filename)
+        }
+        return next(
+          CustomErrorHandler.unprocessableEntity('Invalid or expired OTP')
+        )
       }
       hashedPassword = await bcrypt.hash(password, 10)
       user.verification_otp = null
@@ -494,7 +528,9 @@ exports.updateUser = async (req, res, next) => {
 
     return responder(res, 200, 'User updated successfully', updatedUser)
   } catch (err) {
-    if (req.file && req.file.filename) {deleteImage(req.file.filename)}
+    if (req.file && req.file.filename) {
+      deleteImage(req.file.filename)
+    }
     console.error('Error in updateUser:', err)
     return next(err)
   }

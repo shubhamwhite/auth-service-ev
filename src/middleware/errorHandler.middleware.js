@@ -26,8 +26,12 @@ const errorHandler = (err, req, res, next) => {
   if (err instanceof CustomErrorHandler) {
     statusCode = err.status
     message = err.message
-    if (err.errorCode) {extraData.errorCode = err.errorCode}
-    if (err.hint) {extraData.hint = err.hint}
+    if (err.errorCode) {
+      extraData.errorCode = err.errorCode
+    }
+    if (err.hint) {
+      extraData.hint = err.hint
+    }
   }
 
   return responder(

@@ -71,10 +71,7 @@ class CustomErrorHandler extends Error {
   }
 
   // 500 - Internal Server Error
-  static serverError(
-    message = 'Internal server error',
-    errorCode = 'GEN_500'
-  ) {
+  static serverError(message = 'Internal server error', errorCode = 'GEN_500') {
     return new CustomErrorHandler(500, message, errorCode)
   }
 
@@ -96,10 +93,7 @@ class CustomErrorHandler extends Error {
   }
 
   // Custom Success (if ever needed in middleware for logic branching)
-  static success(
-    message = 'Success',
-    errorCode = 'SUCCESS_200'
-  ) {
+  static success(message = 'Success', errorCode = 'SUCCESS_200') {
     return new CustomErrorHandler(200, message, errorCode)
   }
 }
