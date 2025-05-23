@@ -3,7 +3,9 @@ const { Model, DataTypes } = require('sequelize')
 
 module.exports = (sequelize) => {
   class User extends Model {
-    static associate() {}
+    static associate() {
+      // define associations here if any
+    }
   }
 
   User.init(
@@ -63,6 +65,13 @@ module.exports = (sequelize) => {
       block: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
+      },
+
+      // NEW role field
+      role: {
+        type: DataTypes.ENUM('user', 'company', 'admin'),
+        allowNull: false,
+        defaultValue: 'user'
       }
     },
     {

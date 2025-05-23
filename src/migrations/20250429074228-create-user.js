@@ -30,7 +30,6 @@ module.exports = {
       otp_expires_at: {
         type: Sequelize.DATE
       },
-
       profile_image: {
         type: Sequelize.STRING
       },
@@ -54,9 +53,16 @@ module.exports = {
       },
       block: {
         type: Sequelize.BOOLEAN
+      },
+      // NEW role column
+      role: {
+        type: Sequelize.ENUM('user', 'company', 'admin'),
+        allowNull: false,
+        defaultValue: 'user'
       }
     })
   },
+
   async down(queryInterface, Sequelize) {
     await queryInterface.dropTable('Users')
   }

@@ -26,15 +26,22 @@ const signupValidationSchema = (req, res, next) => {
       .messages({
         'any.only': 'Password and repeat password do not match',
         'string.empty': 'Repeat password is required'
+      }),
+    role: Joi.string()
+      .valid('user', 'company')
+      .default('user') // default role to 'user' if not provided
+      .messages({
+        'any.only': 'Role must be either user or company'
       })
   })
 
   const { error } = schema.validate(req.body, { abortEarly: false })
-
   if (error) {
-    return next(error)
+    return res.status(400).json({
+      success: false,
+      message: error.details.map((detail) => detail.message).join(', ')
+    })
   }
-
   next()
 }
 
