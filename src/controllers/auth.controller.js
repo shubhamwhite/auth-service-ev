@@ -214,6 +214,7 @@ exports.googleLogin = async (req, res, next) => {
       sameSite: 'None'
     })
 
+    console.log('get user info',{ userData, token })
     return responder(res, 200, 'Google login successful', { userData, token })
   } catch (err) {
     console.error('Error in Google login:', err)

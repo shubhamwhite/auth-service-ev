@@ -1,3 +1,6 @@
+
+* For husky
+
 1. Install Husky & Commitlint (you already did):
 npm install husky @commitlint/cli @commitlint/config-conventional --save-dev
 

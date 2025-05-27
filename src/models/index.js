@@ -54,7 +54,7 @@ sequelize.sync({ force: false })
 db.connectDB = async () => {
   try {
     await db.sequelize.authenticate()
-    color.success('Database connection has been established successfully.')
+    color.success('MySQL Database connection has been established successfully.')
   } catch (err) {
     color.error('Error connecting to database:', err)
   }
