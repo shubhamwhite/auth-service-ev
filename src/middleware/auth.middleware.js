@@ -12,6 +12,7 @@ const authMiddleware = (req, res, next) => {
     const decoded = jwt.verify(token, config.get('JWT_SECRET'))
 
     req.user = decoded
+    req.role = decoded.role // Assuming the role is part of the JWT payload
     next()
   } catch (err) {
     return next(err)

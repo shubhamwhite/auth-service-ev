@@ -19,7 +19,7 @@ exports.signup = async (req, res, next) => {
 
     // Validate role - only 'user' and 'company' allowed in signup
     const allowedRoles = ['user', 'company']
-    const userRole = allowedRoles.includes(role) ? role : 'user' // fallback to 'user' if invalid or not provided
+    const userRole = allowedRoles.includes(role) ? role : 'user'
 
     const profileImagePath =
       req.file && req.file.filename
@@ -55,10 +55,23 @@ exports.signup = async (req, res, next) => {
     const { password: _, ...user } = newUser.dataValues
 
     const channel = getChannel() || (await connectRabbitMQ())
+
     const emailJob = { email, otp, name: first_name, flag: 'verify' }
     channel.sendToQueue('emailQueue', Buffer.from(JSON.stringify(emailJob)), {
       persistent: true
     })
+
+    console.log('+++++emailJob+++++', userRole)
+
+    if (userRole === 'company') {
+      const welcomeJob = { email, name: first_name, flag: 'welcome-company' }
+      channel.sendToQueue('emailQueue', Buffer.from(JSON.stringify(welcomeJob)), {
+        persistent: true
+      })} else {
+      const welcomeJob = { email, name: first_name, flag: 'welcome-user' }
+      channel.sendToQueue('emailQueue', Buffer.from(JSON.stringify(welcomeJob)), {
+        persistent: true
+      })}
 
     const token = generateToken({
       id: newUser.id,
