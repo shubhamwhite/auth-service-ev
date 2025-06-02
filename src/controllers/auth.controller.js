@@ -45,7 +45,7 @@ exports.signup = async (req, res, next) => {
       password: hashedPassword,
       verification_otp: otp,
       is_verified: false,
-      otp_expires_at: new Date(Date.now() + 1 * 60 * 1000),
+      otp_expires_at: new Date(Date.now() + 2 * 60 * 1000),
       profile_image: profileImagePath,
       role: userRole,
       ip_address: req.metadata.ip_address,
@@ -286,7 +286,7 @@ exports.resendOtpOrForgotPassword = async (req, res, next) => {
     const generateAndQueueOtp = async (message) => {
       const otp = generateOTP(6)
       user.verification_otp = otp
-      user.otp_expires_at = new Date(Date.now() + 1 * 60 * 1000)
+      user.otp_expires_at = new Date(Date.now() + 2 * 60 * 1000)
       await user.save()
 
       const channel = getChannel() || (await connectRabbitMQ())
