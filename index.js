@@ -9,6 +9,6 @@ app.listen(PORT, async (err) => {
     color.error('Error starting server:', err)
   } else {
     await connectDB(err) // database connection call
-    color.success(`Server is running on ${PORT} port number.`) // port connection
+    color.success(`Auth-service running on ${PORT} port number.`) // port connection
   }
 })

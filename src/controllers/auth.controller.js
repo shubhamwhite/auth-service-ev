@@ -19,7 +19,7 @@ exports.signup = async (req, res, next) => {
 
     // Validate role - only 'user' and 'company' allowed in signup
     const allowedRoles = ['user', 'company']
-    const userRole = allowedRoles.includes(role) ? role : 'user' // fallback to 'user' if invalid or not provided
+    const userRole = allowedRoles.includes(role) ? role : 'user'
 
     const profileImagePath =
       req.file && req.file.filename
@@ -55,10 +55,23 @@ exports.signup = async (req, res, next) => {
     const { password: _, ...user } = newUser.dataValues
 
     const channel = getChannel() || (await connectRabbitMQ())
+
     const emailJob = { email, otp, name: first_name, flag: 'verify' }
     channel.sendToQueue('emailQueue', Buffer.from(JSON.stringify(emailJob)), {
       persistent: true
     })
+
+    console.log('+++++emailJob+++++', userRole)
+
+    if (userRole === 'company') {
+      const welcomeJob = { email, name: first_name, flag: 'welcome-company' }
+      channel.sendToQueue('emailQueue', Buffer.from(JSON.stringify(welcomeJob)), {
+        persistent: true
+      })} else {
+      const welcomeJob = { email, name: first_name, flag: 'welcome-user' }
+      channel.sendToQueue('emailQueue', Buffer.from(JSON.stringify(welcomeJob)), {
+        persistent: true
+      })}
 
     const token = generateToken({
       id: newUser.id,
@@ -130,7 +143,7 @@ exports.login = async (req, res, next) => {
     })
     res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true })
 
-    return responder(res, 200, 'Login successful', { userData, token })
+    return responder(res, 200, 'Login successful', { ...userData, token })
   } catch (err) {
     console.error('Error in login:', err)
     return next(err)
@@ -214,6 +227,7 @@ exports.googleLogin = async (req, res, next) => {
       sameSite: 'None'
     })
 
+    console.log('get user info',{ userData, token })
     return responder(res, 200, 'Google login successful', { userData, token })
   } catch (err) {
     console.error('Error in Google login:', err)
@@ -375,9 +389,13 @@ exports.getUser = async (req, res, next) => {
     const userId = req.params.id
 
     const user = await _User.findOne({
-      where: { id: userId },
-      attributes: ['id', 'first_name', 'last_name', 'email', 'profile_image']
+      where: { id: userId }
     })
+
+    // ✅ Check here before doing anything else
+    if (!user) {
+      return next(CustomErrorHandler.notFound('User not found'))
+    }
 
     const imagePath = user.profile_image
     const split = imagePath.split('/')
@@ -397,7 +415,6 @@ exports.getUser = async (req, res, next) => {
       }
     }
 
-    // Avoid double prepending if already full URL
     if (fileExists) {
       if (!imagePath.startsWith(URL.BASE)) {
         user.profile_image = `/uploads/${fileName}`
@@ -406,10 +423,6 @@ exports.getUser = async (req, res, next) => {
       }
     } else {
       user.profile_image = '/uploads/user.png'
-    }
-
-    if (!user) {
-      return next(CustomErrorHandler.notFound('User not found'))
     }
 
     const userData = user.toJSON()
