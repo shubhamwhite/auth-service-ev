@@ -143,7 +143,7 @@ exports.login = async (req, res, next) => {
     })
     res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000, httpOnly: true })
 
-    return responder(res, 200, 'Login successful', { userData, token })
+    return responder(res, 200, 'Login successful', { ...userData, token })
   } catch (err) {
     console.error('Error in login:', err)
     return next(err)
@@ -389,9 +389,13 @@ exports.getUser = async (req, res, next) => {
     const userId = req.params.id
 
     const user = await _User.findOne({
-      where: { id: userId },
-      attributes: ['id', 'first_name', 'last_name', 'email', 'profile_image']
+      where: { id: userId }
     })
+
+    // ✅ Check here before doing anything else
+    if (!user) {
+      return next(CustomErrorHandler.notFound('User not found'))
+    }
 
     const imagePath = user.profile_image
     const split = imagePath.split('/')
@@ -411,7 +415,6 @@ exports.getUser = async (req, res, next) => {
       }
     }
 
-    // Avoid double prepending if already full URL
     if (fileExists) {
       if (!imagePath.startsWith(URL.BASE)) {
         user.profile_image = `/uploads/${fileName}`
@@ -420,10 +423,6 @@ exports.getUser = async (req, res, next) => {
       }
     } else {
       user.profile_image = '/uploads/user.png'
-    }
-
-    if (!user) {
-      return next(CustomErrorHandler.notFound('User not found'))
     }
 
     const userData = user.toJSON()
