@@ -392,7 +392,7 @@ exports.getUser = async (req, res, next) => {
       where: { id: userId }
     })
 
-    // ✅ Check here before doing anything else
+    // Check here before doing anything else
     if (!user) {
       return next(CustomErrorHandler.notFound('User not found'))
     }
