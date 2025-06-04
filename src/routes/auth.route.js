@@ -20,9 +20,14 @@ const {
   signupValidationSchema,
   loginValidationSchema
 } = require('../validation/auth.validation')
+
 const swaggerUi = require('swagger-ui-express')
 const swaggerSpec = require('../../docs/swagger')
 
+// Swagger documentation setup
+router.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
+
+// Routes for authentication
 router.route('/login').post(loginValidationSchema, saveLoginMetadata, login)
 router
   .route('/signup')
@@ -43,8 +48,7 @@ router
   .route('/:id')
   .patch(authMiddleware, upload.single('profile_image'), updateUser)
 
-router.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
-
+// Error handling middleware
 router.use(errorHandler)
 
 module.exports = router
