@@ -1,5 +1,6 @@
 'use strict'
 const { Model, DataTypes } = require('sequelize')
+const { v4: uuidv4 } = require('uuid') // Optional if you want to generate manually
 
 module.exports = (sequelize) => {
   class User extends Model {
@@ -11,8 +12,8 @@ module.exports = (sequelize) => {
   User.init(
     {
       id: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4, // Sequelize will generate UUID v4
         allowNull: false,
         primaryKey: true
       },

@@ -392,44 +392,29 @@ exports.getUser = async (req, res, next) => {
       where: { id: userId }
     })
 
-    // Check here before doing anything else
     if (!user) {
       return next(CustomErrorHandler.notFound('User not found'))
     }
 
-    const imagePath = user.profile_image
-    const split = imagePath.split('/')
-    const fileName = split[split.length - 1]
-    console.log('fileName', fileName)
+    const imagePath = user.profile_image || ''
+    const fileName = imagePath.split('/').pop()
 
-    const filePath = path.join(__dirname, '..', 'uploads', 'Profile-Pic')
-    const files = fs.readdirSync(filePath)
-
-    let fileExists = false
-
-    for (const file of files) {
-      if (file === fileName) {
-        fileExists = true
-        console.log('File exists')
-        break
-      }
-    }
+    const profilePicPath = path.join(__dirname, '..', 'uploads', 'Profile-Pic', fileName)
+    const fileExists = fs.existsSync(profilePicPath)
 
     if (fileExists) {
-      if (!imagePath.startsWith(URL.BASE)) {
-        user.profile_image = `/uploads/${fileName}`
-      } else {
-        user.profile_image = imagePath
-      }
+      // Keep image path consistent
+      user.profile_image = imagePath.startsWith(URL.BASE)
+        ? imagePath
+        : `/uploads/Profile-Pic/${fileName}`
     } else {
+      // Set default and save to DB
       user.profile_image = '/uploads/user.png'
+      await user.save() // <--- this saves the updated value
     }
 
     const userData = user.toJSON()
-
-    if (userData.profile_image) {
-      userData.profile_image = `${URL.BASE}${userData.profile_image}`
-    }
+    userData.profile_image = `${URL.BASE}${user.profile_image}`
 
     return responder(res, 200, 'User fetched successfully', userData)
   } catch (err) {
