@@ -409,7 +409,7 @@ exports.getUser = async (req, res, next) => {
         : `/uploads/Profile-Pic/${fileName}`
     } else {
       // Set default and save to DB
-      user.profile_image = '/uploads/user.png'
+      user.profile_image = '/uploads/Profile-Pic/user.png'
       await user.save() // <--- this saves the updated value
     }
 

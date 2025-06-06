@@ -20,12 +20,13 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use(
   '/api/v1/uploads',
-  express.static(path.join(__dirname, '/uploads/Profile-Pic'))
+  express.static(path.join(__dirname, '/uploads'))
 )
 app.set('view engine', 'ejs')
 app.set('views', path.join(__dirname, 'views'))
 
 app.use('/', require('./routes/auth.route'))
+app.use('/company', require('./routes/company.routes'))
 
 app.get('/test', (req, res) => {
   res.send('Hello from the Express app!')
