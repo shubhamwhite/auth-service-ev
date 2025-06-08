@@ -28,8 +28,8 @@ app.set('views', path.join(__dirname, 'views'))
 app.use('/', require('./routes/auth.route'))
 app.use('/company', require('./routes/company.routes'))
 
-app.get('/test', (req, res) => {
-  res.send('Hello from the Express app!')
+app.get('/auth-service', (req, res) => {
+  res.send('auth service up and running!')
 })
 
 module.exports = app
