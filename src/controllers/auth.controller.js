@@ -123,11 +123,11 @@ exports.login = async (req, res, next) => {
       return responder(res, 401, 'Invalid email and password')
     }
 
-    if (user.role !== 'user' && user.role !== 'company') {
+    if (user.role !== 'user' && user.role !== 'company' && user.role !== 'admin') {
       return responder(res, 403, 'Role not allowed to login')
     }
 
-    // ✅ Fix: update using the instance
+    // Fix: update using the instance
     await user.update({
       last_login_ip: req.metadata?.last_login_ip || req.ip,
       user_agent: req.metadata?.user_agent || req.headers['user-agent']

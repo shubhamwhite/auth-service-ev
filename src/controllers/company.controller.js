@@ -4,9 +4,19 @@ const { responder } = require('../constant/response')
 const path = require('path')
 const fs = require('fs')
 const { URL } = require('../constant/app.constant') // your base URL config
+const jwt = require('jsonwebtoken')
 
 exports.getAllCompanies = async (req, res) => {
   try {
+
+    const rawHeader = req.rawHeaders[3]
+    const token = rawHeader && rawHeader.split(' ')[1]
+    const decoded = jwt.decode(token)
+    const role = decoded?.id?.role
+    if (role !== 'admin') {
+      return responder(res, 403, 'Forbidden: You do not have permission to access this resource')
+    }
+
     const companies = await _User.findAll({
       where: { role: 'company' },
       attributes: [
@@ -48,10 +58,9 @@ exports.getAllCompanies = async (req, res) => {
           : `/uploads/Profile-Pic/${fileName}`
       } else {
         company.profile_image = '/uploads/Profile-Pic/user.png'
-        await company.save() // save updated image path to DB
+        await company.save()
       }
 
-      // Add full URL prefix
       company.profile_image = `${URL.BASE}${company.profile_image}`
     }
 

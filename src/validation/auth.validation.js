@@ -28,7 +28,7 @@ const signupValidationSchema = (req, res, next) => {
         'string.empty': 'Repeat password is required'
       }),
     role: Joi.string()
-      .valid('user', 'company')
+      .valid('user', 'company', 'admin')
       .default('user') // default role to 'user' if not provided
       .messages({
         'any.only': 'Role must be either user or company'

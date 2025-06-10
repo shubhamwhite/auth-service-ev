@@ -2,7 +2,7 @@
   "development": {
     "username": "postgres",
     "password": "root",
-    "database": "crystal-event",
+    "database": "crystal_event",
     "host": "127.0.0.1",
     "dialect": "postgres",
     "logging": false,
